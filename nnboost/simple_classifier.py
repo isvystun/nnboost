@@ -1,48 +1,52 @@
 import tensorflow as tf
+import numpy as np
 
 class SimpleClassifier():
-  def __init__(self, seed=None):
+  def __init__(self, activation='softmax', loss='categorical_crossentropy', seed=None):
     self.__seed = seed
     self.__model = None
+    self.__activation = activation
+    self.__loss = loss
 
 
   def fit(self, X, y, epochs=1000, verbose=0):
-    output = len(np.unique(y))   
     tf.random.set_seed(self.__seed)
+
+    x_width = X.shape[1]
     
     #EarlyStop
     callback = tf.keras.callbacks.EarlyStopping(monitor='loss', 
-                                                patience=4, 
+                                                patience=10, 
                                                 verbose=0)
-    kernel_init = tf.keras.initializers.TruncatedNormal(mean=0, stddev=1)
-    bias_init = tf.keras.initializers.TruncatedNormal(mean=0, stddev=0.05)
     
-    self.model = tf.keras.Sequential([
-      tf.keras.layers.Dense(output*2, 
-                            activation='relu',   
-                            kernel_initializer=kernel_init, 
-                            bias_initializer=bias_init
-      ),
-      tf.keras.layers.Dense(output, 
-                            activation='relu',
-                            kernel_initializer=kernel_init, 
-                            bias_initializer=bias_init
-      ),
-      tf.keras.layers.Dense(output, 
-                            activation='softmax',
-                            kernel_initializer=kernel_init, 
-                            bias_initializer=bias_init
-      ),
-    ])
-    self.model.compile(loss='sparse_categorical_crossentropy', optimizer=tf.optimizers.Adam(learning_rate=0.01), metrics=['accuracy'])
-    self.model.fit(X, y, epochs=epochs, callbacks=[callback], verbose=verbose)
+    input_ = tf.keras.layers.Input(shape=[x_width])
+    hidden1 = tf.keras.layers.Dense(2*x_width, activation="relu")(input_)
+    hidden2 = tf.keras.layers.Dense(x_width, activation="relu")(hidden1)
+    hidden3 = tf.keras.layers.Dense(x_width // 2, activation="relu")(hidden2)
+    concat = tf.keras.layers.concatenate([input_, hidden3])
+    output = tf.keras.layers.Dense(y.shape[1], activation=self.__activation, name="output")(concat)
+    self.__model = tf.keras.Model(inputs=[input_], outputs=[output])
+
+    if self.__loss in ['mae','mse','MAPE']:
+      self.__model.compile(loss=self.__loss, optimizer=tf.optimizers.Adam(lr=0.001, decay=1e-6), metrics=[self.__loss])
+    else:
+      self.__model.compile(loss=self.__loss, optimizer=tf.optimizers.Adam(lr=0.001, decay=1e-6), metrics=['accuracy'])
+    self.__model.fit(X, y, epochs=epochs, callbacks=[callback], verbose=verbose)
     
     return self
 
 
   def predict(self, X):
-    return self.model.predict(X)
+    return np.argmax(self.predict_proba(X), axis=1)
 
 
-  def evaluate(self, X, y):
-    self.model.evaluate(X, y)
+  def predict_proba(self, X):
+    return self.__model.predict(X)
+
+
+  # def evaluate(self, X, y):
+  #   self.__model.evaluate(X, y)
+
+  @property
+  def metrics(self):
+    return self.__model.metrics

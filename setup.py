@@ -9,7 +9,7 @@ setuptools.setup(
     author="Igor Svystun",
     author_email="i.svystun.dev@gmail.com",
     packages=["nnboost"],
-    description="A small gradient boosting library  ",
+    description="A small gradient boosting library that uses neural network based learning algorithms",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/isvystun/nnboost",

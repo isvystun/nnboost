@@ -1,1 +1,2 @@
 from .nn_boost_regressor import NNBoostRegressor
+from .nn_boost_classifier import NNBoostClassifier
