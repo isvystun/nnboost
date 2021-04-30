@@ -26,9 +26,11 @@ class AutoEncoder(tf.keras.Model):
     super(AutoEncoder, self).__init__()
     self.__dense11 = tf.keras.layers.Dense(inputs_width, activation="selu")
     self.__dense12 = tf.keras.layers.Dense(inputs_width//2, activation="selu")
+    self.__reg = tf.keras.layers.ActivityRegularization(l1=1e-3)
     self.encoder = tf.keras.Sequential([
         self.__dense11,
-        self.__dense12
+        self.__dense12,
+        self.__reg
     ])
 
     self.__dense21 = DenseTranspose(self.__dense12, activation='selu')

@@ -4,17 +4,19 @@ import numpy as np
 import tensorflow.keras.metrics as tm
 # local
 from .simple_regressor import SimpleRegressor
+from .autoencoder import AutoEncoder
 
 class NNBoostRegressor:
-  def __init__(self, *, n_estimators=100, degree=1, n_num_columns=0,base_model_method='mean', learning_rate=1, seed=None):
+  def __init__(self, *, n_estimators=100,base_model_method='mean', learning_rate=1, auto_encoder=False, seed=None):
     self.__seed : int = seed
     self.__n_estimators : int = n_estimators # number of neural networks
     self.__estimators : dict[int, SimpleRegressor] = {}
     self.__learning_rate : float = learning_rate
     self.__metrics = {}
-    self.__degree = degree
     self.__base_model_method = base_model_method
-    self.__n_num_columns = n_num_columns
+    self.__auto_encoder = auto_encoder
+    self.__is_trained = False
+
 
   @property
   def estimators(self):
@@ -26,18 +28,28 @@ class NNBoostRegressor:
 
 
   def fit(self, X, y, *, verbose=0):
+    x_width = X.shape[1]
     # concat = []#np.ones((X.shape[0],1))]
-    if self.__n_num_columns > 0:
-      X_num = X[:,0:self.__n_num_columns].copy()
-      X_cat = X[:,self.__n_num_columns:].copy()
-
-      concat = [X_num.copy()**d for d in range(1, self.__degree+1)]
-      self._X_train = np.c_[np.concatenate(concat, axis=1), X_cat] 
-    else:
-      self._X_train = X.copy()
+    self._X_train = X.copy()
 
     self.__original_output = y.copy()
     
+
+    if self.__auto_encoder:
+      self.auto = AutoEncoder(x_width)
+      self.auto.compile(loss='mse', 
+                   optimizer=tf.keras.optimizers.Adam(learning_rate=0.01, decay=1e-6), 
+                   metrics=['mae'])
+      callback = tf.keras.callbacks.EarlyStopping(monitor='loss', 
+                                            patience=3, 
+                                            verbose=0)
+      self.auto.fit(x=X.copy(), 
+               y=X.copy(), 
+               epochs=100, 
+               batch_size=32, 
+               callbacks=[callback],
+               verbose=0)
+      self._X_train = self.auto.encoder.predict(X.copy())
 #     if (isinstance(self.__base_model_method, str) and self.__base_model_method in ['mean', 'median']):
 #         base_model = getattr(np, self.__base_model_method)
 #         self.__base = base_model(self.__original_output)
@@ -45,7 +57,7 @@ class NNBoostRegressor:
 #         self.__base = self.__base_model_method
 #     else:
 #         raise Exception("base_model_method must be ['mean', 'median'] or any int or float number.")
-    self.__base = SimpleRegressor().fit(self._X_train, self.__original_output, verbose=verbose)
+    self.__base = SimpleRegressor(output_activation='softplus').fit(self._X_train, self.__original_output, verbose=verbose)
     self.__gamma = {}
     updated_model=self.__base.predict(self._X_train)
 #     updated_model=self.__base
@@ -56,8 +68,9 @@ class NNBoostRegressor:
       predictor = self.__estimators[i].predict(self._X_train)
 #       self.__gamma[i] = np.median((self.__original_output - updated_model)/predictor)
 #       self.__gamma[i] = np.linalg.pinv(predictor.reshape(-1,1)).dot(self.__original_output - updated_model)[0]
-#       self.__gamma[i] = 1
+      
       gamma = self.__newton(self.__original_output, updated_model, predictor)
+      # gamma = 1
       if np.isnan(gamma):
             break
       self.__gamma[i] = gamma
@@ -66,22 +79,21 @@ class NNBoostRegressor:
       mae = self.__estimators[i].metrics[0].result().numpy()
       self.__metrics[i] = mae
       print(f"NN #{i} is done -> MAE : {mae}")
+    
+    self.__is_trained = True
     return self
 
 
-
   def predict(self, X):
-    if self.__n_num_columns > 0:
-      X_num = X[:,0:self.__n_num_columns].copy()
-      X_cat = X[:,self.__n_num_columns:].copy()
+    if not self.__is_trained:
+      raise Exception('Model must be trained first. Please use model.fit(...) method.')
 
-      concat = [X_num.copy()**d for d in range(1, self.__degree+1)]
-      _X = np.c_[np.concatenate(concat, axis=1), X_cat] 
-    
+    if self.__auto_encoder:
+      _X = self.auto.encoder.predict(X.copy())
     else:
       _X = X.copy()
 
-    return np.sum([self.__estimators[i].predict(_X)*self.__learning_rate*self.__gamma[i]
+    return np.sum([self.__estimators[i].predict(_X)*self.__gamma[i]*self.__learning_rate
                           for i in self.__gamma.keys()
                   ], axis=0) + self.__base.predict(_X) 
 
