@@ -37,21 +37,21 @@ class NNBoostClassifier:
     predictor = None
     
   
-    # self.__base = SimpleClassifier(activation='linear',loss='mse').fit(_X, original_output)
-    self.__base = np.mean(original_output[0])
+    self.__base = SimpleClassifier(loss='mae').fit(_X, original_output, sample_weight=self.__get_sample_weight(y))
+    # self.__base = np.mean(original_output[0])
     self.__gamma = {}
-    # updated_model=self.__base.predict_proba(_X)
-    updated_model=np.mean(original_output[0])
+    updated_model=self.__base.predict_proba(_X)
+    # updated_model=np.mean(original_output[0])
     for i in range(self.__n_estimators):
       output = original_output - updated_model
 
-      self.__estimators[i] = SimpleClassifier(activation='linear',loss='mse').fit(_X, output, verbose=verbose)
+      self.__estimators[i] = SimpleClassifier(activation='linear',loss='mae')\
+        .fit(_X, output, verbose=verbose)
       
       predictor = self.__estimators[i].predict_proba(_X)
       self.__gamma[i] = np.linalg.pinv(predictor).dot(output)[0]
       # self.__gamma[i] = 1
       self.predictor[i] = predictor
-      print(f'{np.sum(predictor)}')
       updated_model += predictor*self.__gamma[i]*self.__learning_rate
         
       mae = self.__estimators[i].metrics[1].result().numpy()
@@ -67,13 +67,20 @@ class NNBoostClassifier:
       _X = X.copy()
     return np.sum([self.__estimators[i].predict_proba(_X)*self.__learning_rate*self.__gamma[i]
                           for i in self.__estimators.keys()
-                  ], axis=0) + self.__base #.predict_proba(_X) 
+                  ], axis=0) + self.__base.predict_proba(_X) 
 
 
   def predict(self, X):
       return np.argmax(self.predict_proba(X), axis=1)
 
+
+  def __get_sample_weight(self, y):
+    m = {key : 2-value/len(y) for (key, value) in zip(*np.unique(y, return_counts=True))}
+    f = lambda x : m[x]
+    vfunc = np.vectorize(f)
+    return vfunc(y) 
   
+
   def __normalize_zero(self, y):
     n = y.shape[1]
     return y - np.sum(y, axis=1).reshape(-1,1)/n

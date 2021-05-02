@@ -1,4 +1,5 @@
 .vscode/
+.ipynb_checkpoints/
 nnboost/.ipynb_checkpoints/
 nnboost/__pycache__/
 test/.ipynb_checkpoints

@@ -9,9 +9,12 @@ class SimpleClassifier():
     self.__loss = loss
 
 
-  def fit(self, X, y, epochs=1000, verbose=0):
+  def fit(self, X, y, sample_weight=None, epochs=1000, verbose=0):
     tf.random.set_seed(self.__seed)
-
+    
+    if sample_weight is None:
+      sample_weight = np.ones(shape=(len(y),))
+    
     x_width = X.shape[1]
     
     #EarlyStop
@@ -22,16 +25,14 @@ class SimpleClassifier():
     input_ = tf.keras.layers.Input(shape=[x_width])
     hidden1 = tf.keras.layers.Dense(2*x_width, activation="relu")(input_)
     hidden2 = tf.keras.layers.Dense(x_width, activation="relu")(hidden1)
-    hidden3 = tf.keras.layers.Dense(x_width // 2, activation="relu")(hidden2)
-    concat = tf.keras.layers.concatenate([input_, hidden3])
-    output = tf.keras.layers.Dense(y.shape[1], activation=self.__activation, name="output")(concat)
+    output = tf.keras.layers.Dense(y.shape[1], activation=self.__activation, name="output")(hidden2)
     self.__model = tf.keras.Model(inputs=[input_], outputs=[output])
 
     if self.__loss in ['mae','mse','MAPE']:
-      self.__model.compile(loss=self.__loss, optimizer=tf.optimizers.Adam(lr=0.001, decay=1e-6), metrics=[self.__loss])
+      self.__model.compile(loss=self.__loss, optimizer=tf.optimizers.Adam(learning_rate=0.005), metrics=[self.__loss])
     else:
-      self.__model.compile(loss=self.__loss, optimizer=tf.optimizers.Adam(lr=0.001, decay=1e-6), metrics=['accuracy'])
-    self.__model.fit(X, y, epochs=epochs, callbacks=[callback], verbose=verbose)
+      self.__model.compile(loss=self.__loss, optimizer=tf.optimizers.Adam(learning_rate=0.005), metrics=['accuracy'])
+    self.__model.fit(X, y, sample_weight=sample_weight, epochs=epochs, callbacks=[callback], verbose=verbose)
     
     return self
 
