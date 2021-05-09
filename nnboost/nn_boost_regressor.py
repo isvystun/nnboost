@@ -57,7 +57,7 @@ class NNBoostRegressor:
 #         self.__base = self.__base_model_method
 #     else:
 #         raise Exception("base_model_method must be ['mean', 'median'] or any int or float number.")
-    self.__base = SimpleRegressor(output_activation='softplus').fit(self._X_train, self.__original_output, verbose=verbose)
+    self.__base = SimpleRegressor().fit(self._X_train, self.__original_output, verbose=verbose)
     self.__gamma = {}
     updated_model=self.__base.predict(self._X_train)
 #     updated_model=self.__base
@@ -66,11 +66,10 @@ class NNBoostRegressor:
       self.__estimators[i] = SimpleRegressor().fit(self._X_train, output, verbose=verbose)
       
       predictor = self.__estimators[i].predict(self._X_train)
-#       self.__gamma[i] = np.median((self.__original_output - updated_model)/predictor)
 #       self.__gamma[i] = np.linalg.pinv(predictor.reshape(-1,1)).dot(self.__original_output - updated_model)[0]
       
       gamma = self.__newton(self.__original_output, updated_model, predictor)
-      # gamma = 1
+      print(f"gamma {gamma}")
       if np.isnan(gamma):
             break
       self.__gamma[i] = gamma
@@ -107,17 +106,7 @@ class NNBoostRegressor:
     
 
   def __newton(self, y, F, h):
-    gamma_prev = 1
-    gamma_next = 0
-    for _ in range(1000):
-      L = np.sum((y-(F+h*gamma_prev))**2)
-      dL = 2*(np.sum(h)*np.sum(h*gamma_prev+F-y))
-      gamma_next = gamma_prev - L/ dL
-      if abs(gamma_next-gamma_prev) < 0.1:
-        return gamma_next
-      else:
-        gamma_prev = gamma_next
-    return np.nan
+    return np.sum(y - F) / np.sum(h)
 
 
 # 
