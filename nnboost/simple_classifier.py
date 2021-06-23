@@ -29,9 +29,9 @@ class SimpleClassifier():
     self.__model = tf.keras.Model(inputs=[input_], outputs=[output])
 
     if self.__loss in ['mae','mse','MAPE']:
-      self.__model.compile(loss=self.__loss, optimizer=tf.optimizers.Adam(learning_rate=0.005), metrics=[self.__loss])
+      self.__model.compile(loss=self.__loss, optimizer=tf.optimizers.Adam(learning_rate=0.01), metrics=[self.__loss])
     else:
-      self.__model.compile(loss=self.__loss, optimizer=tf.optimizers.Adam(learning_rate=0.005), metrics=['accuracy'])
+      self.__model.compile(loss=self.__loss, optimizer=tf.optimizers.Adam(learning_rate=0.01), metrics=['accuracy'])
     self.__model.fit(X, y, sample_weight=sample_weight, epochs=epochs, callbacks=[callback], verbose=verbose)
     
     return self

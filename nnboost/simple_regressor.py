@@ -18,9 +18,14 @@ class SimpleRegressor():
                                                 verbose=0)
     
     input_ = tf.keras.layers.Input(shape=[output])
-    hidden1 = tf.keras.layers.Dense(2*output, activation="relu")(input_)
-    hidden2 = tf.keras.layers.Dense(output, activation="relu")(hidden1)
-    output = tf.keras.layers.Dense(1, activation=self.__output_activation, name="output")(hidden2)
+    hidden1 = tf.keras.layers.Dense(output, activation="relu")(input_)
+    if output > 4:
+      hidden2 = tf.keras.layers.Dense(output // 2, activation="relu")(hidden1)
+      hidden3 = tf.keras.layers.Dense(output, activation="relu")(hidden2)
+      output = tf.keras.layers.Dense(1, activation=self.__output_activation, name="output")(hidden3)
+    else:
+      output = tf.keras.layers.Dense(1, activation=self.__output_activation, name="output")(hidden1)
+
     self.__model = tf.keras.Model(inputs=[input_], outputs=[output])
     
     
@@ -40,7 +45,7 @@ class SimpleRegressor():
     #                         bias_initializer=bias_init
     #   )
     # ])
-    self.__model.compile(loss=loss, optimizer=tf.optimizers.Adam(learning_rate=0.005), metrics=[loss])
+    self.__model.compile(loss=loss, optimizer=tf.optimizers.Adam(learning_rate=0.01), metrics=[loss])
     self.__model.fit(X, y, epochs=epochs, callbacks=[callback], verbose=verbose)
     
     return self
